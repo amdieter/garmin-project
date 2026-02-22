@@ -146,7 +146,7 @@ def get_ai_hot_take(stats):
         api_key = os.getenv("GOOGLE_API_KEY")
         llm_joke = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash", google_api_key=api_key)
         # Use the already initialized coach_agent or llm
-        prompt = f"Write a 1-sentence funny, running coach comment about these stats: {stats}. Keep it fun and use comparisons to real-world things."
+        prompt = f"Write a 1-sentence funny, running coach comment about these stats: {stats}. Keep it fun and use comparisons to real-world things, focus on ridiculous comparisons with total distance and total elevation gain."
         response = llm_joke.invoke(prompt) # Or use your llm.invoke()
         return response.content
     except Exception as e:
@@ -180,7 +180,7 @@ def get_agent():
         coaching_retriever = coaching_store.as_retriever()
         coaching_store.save_local("docs/coaching-store")
 
-    llm = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash", google_api_key = api_key, temperature=0)
+    llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash", google_api_key = api_key, temperature=0)
 
     def workout_data_query(query: str):
         current_df = st.session_state.get("df_data")
@@ -222,8 +222,6 @@ def get_agent():
     """
     instructions = SystemMessage(content=Custom_Coach_Prompt)
     
-    base_prompt = hub.pull("hwchase17/openai-tools-agent")
-
     agent_prompt = ChatPromptTemplate.from_messages([
         ("system", "You are an analytical running coach. Analyze Garmin data and provide advice."),
         MessagesPlaceholder(variable_name="chat_history"),
@@ -246,13 +244,18 @@ with st.sidebar:
     
     # Use st.session_state to track the active selection
     if c1.button("Week"):
+        msgs.clear()
+        st.session_state.memory.clear()
         st.session_state.range_days = 7
         st.rerun()
-        # Optional: st.cache_data.clear() # Uncomment this if you want to FORCE a fresh download from Garmin
     if c2.button("Month"):
+        msgs.clear()
+        st.session_state.memory.clear()
         st.session_state.range_days = 30
         st.rerun()
     if c3.button("Year"):
+        msgs.clear()
+        st.session_state.memory.clear()
         st.session_state.range_days = 365
         st.rerun()
         
@@ -260,7 +263,7 @@ with st.sidebar:
     # Logic: If the button was just clicked, the script reruns and picks up this value
     current_range = st.session_state.get("range_days", 7)
 
-# 2. NOW FETCH DATA BASED ON THAT RANGE
+# Fetch data
 if "df_data" not in st.session_state or st.session_state.get("last_n_days") != current_range:
     with st.spinner(f"Fetching last {current_range} days..."):
         result = get_cached_workout_data(current_range)
@@ -283,7 +286,53 @@ if "coach_agent" not in st.session_state:
 coach_agent = st.session_state.coach_agent
 df = st.session_state.get("df_data")
 
-# 4. SIDEBAR STATISTICS (Using the already fetched 'df')
+
+# Activity Selector Dropdown
+if df is not None and not df.empty:
+    st.divider()
+    
+    # Create a label for the dropdown (Date + Name)
+    df['display_name'] = df['Date'].dt.strftime('%Y-%m-%d') + " - " + df['Activity Name']
+    
+    # 1. Selection Box
+    selected_run_name = st.selectbox("Select a past activity to analyze:", df['display_name'])
+    
+    # Get the specific row for that activity
+    run_data = df[df['display_name'] == selected_run_name].iloc[0]
+
+    # 2. Key Metrics for the specific run
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Distance", f"{run_data['Distance (mi)']} mi")
+    col2.metric("Pace", f"{run_data['Pace_Decimal']:.2f} min/mi")
+    col3.metric("Avg HR", f"{run_data['Avg HR']} bpm")
+    col4.metric("Elev Gain", f"{run_data['Elev Gain (ft)']} ft")
+
+    # 3. Heart Rate Zone Visualization
+    st.subheader("Heart Rate Zone Distribution")
+    
+    # Prepare data for a Bar Chart
+    hr_zones = {
+        "Zone 1 (Recovery)": run_data['Z1_Min'],
+        "Zone 2 (Aerobic)": run_data['Z2_Min'],
+        "Zone 3 (Tempo)": run_data['Z3_Min'],
+        "Zone 4 (Threshold)": run_data['Z4_Min'],
+        "Zone 5 (Anaerobic)": run_data['Z5_Min']
+    }
+    
+    # Convert to a mini dataframe for plotting
+    hr_df = pd.DataFrame(list(hr_zones.items()), columns=['Zone', 'Minutes'])
+    
+    # Display as a Bar Chart
+    st.bar_chart(hr_df.set_index('Zone'))
+
+if st.button("Coach: Critique this Run"):
+    with st.spinner("Analyzing effort..."):
+        # We pass the specific run data to the agent
+        critique_query = f"Analyze this specific run: {run_data.to_json()}. Based on the HR zones and pace, was this a good workout? Check the coaching PDFs for context."
+        response = coach_agent.invoke({"input": critique_query})
+        st.chat_message("assistant").write(response["output"])
+
+# Sidebar Statistics
 with st.sidebar:
     if df is not None and not df.empty:
         # Pass the already loaded df to summary to avoid double-fetching
