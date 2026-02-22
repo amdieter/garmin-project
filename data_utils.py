@@ -3,6 +3,9 @@ import pandas as pd
 import garminconnect
 from datetime import date, timedelta
 import matplotlib.pyplot as plt
+import folium
+from streamlit_folium import st_folium
+from folium.plugins import HeatMap
 
 # data fetching
 def get_workout_dataframe_n_days(n_days, email, password):
@@ -34,6 +37,8 @@ def get_workout_dataframe_n_days(n_days, email, password):
                 "Avg HR": act.get('averageHR'),
                 "VO2 Max": act.get('vO2MaxValue'),
                 "Elev Gain (ft)": round(act.get('elevationGain', 0) * 3.28084, 1),
+                "Latitude": act.get('startLatitude'),
+                "Longitude": act.get('startLongitude'),
                 "Z1_Min": round(act.get('hrTimeInZone_1', 0) / 60, 2),
                 "Z2_Min": round(act.get('hrTimeInZone_2', 0) / 60, 2),
                 "Z3_Min": round(act.get('hrTimeInZone_3', 0) / 60, 2),
@@ -51,8 +56,11 @@ def get_cached_workout_data(days, email, password):
 
 # Calculations 
 def summarize_n_days(df):
-    if df is None or df.empty:
-        return {}
+    if isinstance(df, tuple) or df is None or df.empty:
+        return {"Total Distance Run (mi)": 0,
+            "Total Elevation Gained (ft)": 0,
+            "Current VO2 Max": "N/A",
+            "Longest Run (mi)": 0}
     
     summary = {
         "Total Distance Run (mi)": df["Distance (mi)"].sum(),
@@ -60,6 +68,12 @@ def summarize_n_days(df):
         "Current VO2 Max": df["VO2 Max"].dropna().iloc[0] if not df["VO2 Max"].dropna().empty else "N/A",
         "Longest Run (mi)": df["Distance (mi)"].max()
     }
+    # if n_days > 1:
+    #     clean_df = df.dropna()
+    #     if len(clean_df) > 1:
+    #         summary["VO2 Max Progress"] = clean_df["VO2 Max"].iloc[0] - clean_df["VO2 Max"].iloc[-1]
+    # if n_days >= 31:
+    #     summary["Most Active Month"] = most_active_month(df)
     return summary
 
 # Plotting
@@ -227,3 +241,46 @@ def get_training_stress(df):
     ratio = acute_load / chronic_load
     return round(ratio, 2)
 
+def plot_activity_map(df):
+    # Filter for rows that have GPS data
+    if "Latitude" not in df.columns or "Longitude" not in df.columns:
+        st.warning("GPS data not found in the current dataset.")
+        return None
+
+    coords = df[["Activity Name", "Latitude", "Longitude", "Distance (mi)", "Date"]].dropna()
+    
+    if coords.empty:
+        st.info("No coordinate data available to map.")
+        return None
+
+    # Center map on the most recent activity or mean location
+    m = folium.Map(
+        location=[coords["Latitude"].mean(), coords["Longitude"].mean()],
+        zoom_start=12,
+        tiles="CartoDB positron" # Clean, professional look
+    )
+
+    # Add markers for activity start points
+    marker_group = folium.FeatureGroup(name="Individual Runs").add_to(m)
+    for _, row in coords.iterrows():
+
+        popup_info = f"""
+            <strong>{row['Activity Name']}</strong><br>
+            Distance: {row['Distance (mi)']} mi<br>
+            Date: {row['Date'].strftime('%Y-%m-%d')}
+        """
+        folium.CircleMarker(
+            location=[row["Latitude"], row["Longitude"]],
+            radius=4,
+            color="#3B82F6",
+            fill=True,
+            fill_opacity=0.7,
+            popup=folium.Popup(popup_info, max_width=250)
+        ).add_to(marker_group)
+    
+    heat_data = coords[["Latitude", "Longitude"]].values.tolist()
+    HeatMap(heat_data, name="Heatmap (Density)", min_opacity=0.4, radius=16).add_to(m)
+
+    folium.LayerControl().add_to(m)
+    
+    st_folium(m, width=None, height=600, use_container_width=True, returned_objects=[])

@@ -25,7 +25,7 @@ from datetime import datetime, date, timedelta
 from langchain_core.messages import SystemMessage
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 import matplotlib.pyplot as plt
-from data_utils import get_cached_workout_data, summarize_n_days, get_training_stress
+from data_utils import get_cached_workout_data, summarize_n_days, get_training_stress, get_workout_dataframe_n_days
 GARMIN_CACHE = None
 load_dotenv("cred.env")
 
@@ -39,27 +39,27 @@ if "memory" not in st.session_state:
     )
 
 # Functions
-def summarize_n_days(n_days=1):
-    df = get_workout_dataframe_n_days(n_days)
-    if isinstance(df, tuple) or df is None or df.empty:
-        return {k: 0 for k in ["Longest Run (mi)", "Total Distance Run (mi)", "Total Elevation Gained (ft)"]} | {"Current VO2 Max": "N/A"}
+# def summarize_n_days(n_days=1):
+#     df = get_workout_dataframe_n_days(n_days)
+#     if isinstance(df, tuple) or df is None or df.empty:
+#         return {k: 0 for k in ["Longest Run (mi)", "Total Distance Run (mi)", "Total Elevation Gained (ft)"]} | {"Current VO2 Max": "N/A"}
 
-    summary = {}
-    summary["Longest Run (mi)"] = df["Distance (mi)"].max()
-    summary["Longest Run (min)"] = df["Duration (min)"].max()
-    summary["Average Run Length (mi)"] = df["Distance (mi)"].mean()
-    summary["Total Distance Run (mi)"] = df["Distance (mi)"].sum()
-    summary["Total Duration Run (min)"] = df["Duration (min)"].sum()
-    summary["Total Elevation Gained (ft)"] = df["Elev Gain (ft)"].sum()
-    summary["Total Elevation Lost (ft)"] = df["Elev Loss (ft)"].sum()
-    summary["Current VO2 Max"] = df["VO2 Max"][0]
-    if n_days > 1:
-        clean_df = df.dropna()
-        if len(clean_df) > 1:
-            summary["VO2 Max Progress"] = clean_df["VO2 Max"].iloc[0] - clean_df["VO2 Max"].iloc[-1]
-    if n_days >= 31:
-        summary["Most Active Month"] = most_active_month(df)
-    return summary
+#     summary = {}
+#     summary["Longest Run (mi)"] = df["Distance (mi)"].max()
+#     summary["Longest Run (min)"] = df["Duration (min)"].max()
+#     summary["Average Run Length (mi)"] = df["Distance (mi)"].mean()
+#     summary["Total Distance Run (mi)"] = df["Distance (mi)"].sum()
+#     summary["Total Duration Run (min)"] = df["Duration (min)"].sum()
+#     summary["Total Elevation Gained (ft)"] = df["Elev Gain (ft)"].sum()
+#     summary["Total Elevation Lost (ft)"] = df["Elev Loss (ft)"].sum()
+#     summary["Current VO2 Max"] = df["VO2 Max"][0]
+#     if n_days > 1:
+#         clean_df = df.dropna()
+#         if len(clean_df) > 1:
+#             summary["VO2 Max Progress"] = clean_df["VO2 Max"].iloc[0] - clean_df["VO2 Max"].iloc[-1]
+#     if n_days >= 31:
+#         summary["Most Active Month"] = most_active_month(df)
+#     return summary
 
 def most_active_month(df):
     df['Month'] = df['Date'].dt.month
@@ -68,63 +68,63 @@ def most_active_month(df):
     miles = monthly_miles.max()
     return month, miles
 
-def get_workout_dataframe_n_days(n_days):
-    try:
-        client = garminconnect.Garmin(os.getenv("GARMIN_EMAIL"), os.getenv("GARMIN_PASSWORD"))
-        client.login()
-        today = date.today()
-        days_to_subtract = timedelta(days=n_days)
-        start = str(today - days_to_subtract)
-        activities = client.get_activities_by_date(startdate = start, enddate = str(today))
+# def get_workout_dataframe_n_days(n_days):
+#     try:
+#         client = garminconnect.Garmin(os.getenv("GARMIN_EMAIL"), os.getenv("GARMIN_PASSWORD"))
+#         client.login()
+#         today = date.today()
+#         days_to_subtract = timedelta(days=n_days)
+#         start = str(today - days_to_subtract)
+#         activities = client.get_activities_by_date(startdate = start, enddate = str(today))
 
-        # if there's no activities in date range, return first (most recent) activity
-        if not activities:
-            activities = client.get_activities(0,1)
+#         # if there's no activities in date range, return first (most recent) activity
+#         if not activities:
+#             activities = client.get_activities(0,1)
 
-        data_list = []
-        for act in activities:
-            if act["activityType"]["typeKey"] != "running":
-                # print("non running")
-                continue
-            dist_mi = act.get('distance', 0) / 1609.34
-            dur_min = act.get('duration', 0) / 60
+#         data_list = []
+#         for act in activities:
+#             if act["activityType"]["typeKey"] != "running":
+#                 # print("non running")
+#                 continue
+#             dist_mi = act.get('distance', 0) / 1609.34
+#             dur_min = act.get('duration', 0) / 60
 
-            # Pace Calculations
-            pace_decimal = dur_min / dist_mi if dist_mi > 0 else 0
+#             # Pace Calculations
+#             pace_decimal = dur_min / dist_mi if dist_mi > 0 else 0
 
-            # HR Zones (Converted from Seconds to Minutes)
-            z1 = act.get('hrTimeInZone_1', 0) / 60
-            z2 = act.get('hrTimeInZone_2', 0) / 60
-            z3 = act.get('hrTimeInZone_3', 0) / 60
-            z4 = act.get('hrTimeInZone_4', 0) / 60
-            z5 = act.get('hrTimeInZone_5', 0) / 60
+#             # HR Zones (Converted from Seconds to Minutes)
+#             z1 = act.get('hrTimeInZone_1', 0) / 60
+#             z2 = act.get('hrTimeInZone_2', 0) / 60
+#             z3 = act.get('hrTimeInZone_3', 0) / 60
+#             z4 = act.get('hrTimeInZone_4', 0) / 60
+#             z5 = act.get('hrTimeInZone_5', 0) / 60
 
-            record = {
-                "Activity Name": act.get('activityName'),
-                "Date": pd.to_datetime(act.get('startTimeLocal')),
-                "Distance (mi)": round(dist_mi, 2),
-                "Duration (min)": round(dur_min, 2),
-                "Pace_Decimal": round(pace_decimal, 2),
-                "Avg HR": act.get('averageHR'),
-                "Max HR": act.get('maxHR'),
-                "Elev Gain (ft)": round(act.get('elevationGain', 0) * 3.28084, 1),
-                "Elev Loss (ft)": round(act.get('elevationLoss', 0) * 3.28084, 1),
-                "VO2 Max": act.get('vO2MaxValue'),
-                # HR Zone columns
-                "Z1_Min": round(z1, 2),
-                "Z2_Min": round(z2, 2),
-                "Z3_Min": round(z3, 2),
-                "Z4_Min": round(z4, 2),
-                "Z5_Min": round(z5, 2)
-            }
-            data_list.append(record)
+#             record = {
+#                 "Activity Name": act.get('activityName'),
+#                 "Date": pd.to_datetime(act.get('startTimeLocal')),
+#                 "Distance (mi)": round(dist_mi, 2),
+#                 "Duration (min)": round(dur_min, 2),
+#                 "Pace_Decimal": round(pace_decimal, 2),
+#                 "Avg HR": act.get('averageHR'),
+#                 "Max HR": act.get('maxHR'),
+#                 "Elev Gain (ft)": round(act.get('elevationGain', 0) * 3.28084, 1),
+#                 "Elev Loss (ft)": round(act.get('elevationLoss', 0) * 3.28084, 1),
+#                 "VO2 Max": act.get('vO2MaxValue'),
+#                 # HR Zone columns
+#                 "Z1_Min": round(z1, 2),
+#                 "Z2_Min": round(z2, 2),
+#                 "Z3_Min": round(z3, 2),
+#                 "Z4_Min": round(z4, 2),
+#                 "Z5_Min": round(z5, 2)
+#             }
+#             data_list.append(record)
 
-        df = pd.DataFrame(data_list)
+#         df = pd.DataFrame(data_list)
 
-        return df
+#         return df
 
-    except Exception as e:
-        return None, f"Error: {e}"
+#     except Exception as e:
+#         return None, f"Error: {e}"
 
 # Tool Setup
 
@@ -143,7 +143,6 @@ def get_ai_hot_take(stats):
     except Exception as e:
         return f"Keep up the pace, human! {e}"
 
-@st.cache_resource
 def get_agent():
     load_dotenv("cred.env")
     api_key = os.getenv("GOOGLE_API_KEY")
@@ -172,23 +171,22 @@ def get_agent():
     llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash", google_api_key = api_key, temperature=0)
 
     def workout_data_query(query: str):
-        current_df = st.session_state.get("df_data")
-        
-        if current_df is None or (isinstance(current_df, pd.DataFrame) and current_df.empty):
-            return "I'm having trouble accessing your Garmin data. Please ensure you are logged in."
+        try:
+            current_df = st.session_state.get("df_data")
+            if current_df is None:
+                return "Dataframe not found. Please refresh the data."
             
-        # If by any chance it's still a tuple, grab the first element
-        if isinstance(current_df, tuple):
-            current_df = current_df[0]
-            
-        df_agent = create_pandas_dataframe_agent(
-            llm, 
-            current_df, 
-            verbose=False, 
-            allow_dangerous_code=True
-        )
-        response = df_agent.invoke({"input": query})
-        return response["output"]
+            df_agent = create_pandas_dataframe_agent(
+                llm, 
+                current_df, 
+                verbose=False, 
+                allow_dangerous_code=True,
+                handle_parsing_errors=True 
+            )
+            response = df_agent.invoke({"input": query})
+            return response["output"]
+        except Exception as e:
+            return f"Error analyzing data: {str(e)}"
 
     search_tool = TavilySearchResults(tavily_api_key = os.getenv("TAVILY_API_KEY"))
 
@@ -260,13 +258,14 @@ if __name__ == "__main__":
         
         email = st.session_state.garmin_email
         pwd = st.session_state.garmin_password
-        current_range = st.session_state.get("range_days", 7)
+        current_range = st.session_state.get("range_days", 7) # Pull last week
         
         df = get_cached_workout_data(current_range, email, pwd)
         stats = summarize_n_days(df)
         
         # Store df in session state
         st.session_state.df_data = df
+        st.session_state.coach_agent = get_agent()
     
     st.title("Garmin Analytics AI")
 
@@ -295,14 +294,9 @@ if __name__ == "__main__":
         # Logic: If the button was just clicked, the script reruns and picks up this value
         current_range = st.session_state.get("range_days", 7)
     
-    # Initialize agent
-    if "coach_agent" not in st.session_state:
-        st.session_state.coach_agent = get_agent()
-    
     # Aliases
     coach_agent = st.session_state.coach_agent
     df = st.session_state.get("df_data")
-    
     
     # Activity Selector Dropdown
     if df is not None and not df.empty:
@@ -311,13 +305,13 @@ if __name__ == "__main__":
         # Create a label for the dropdown (Date + Name)
         df['display_name'] = df['Date'].dt.strftime('%Y-%m-%d') + " - " + df['Activity Name']
         
-        # 1. Selection Box
+        # Selection Box
         selected_run_name = st.selectbox("Select a past activity to analyze:", df['display_name'])
         
         # Get the specific row for that activity
         run_data = df[df['display_name'] == selected_run_name].iloc[0]
     
-        # 2. Key Metrics for the specific run
+        # Key Metrics for the specific run
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Distance", f"{run_data['Distance (mi)']} mi")
         col2.metric("Pace", f"{run_data['Pace_Decimal']:.2f} min/mi")
@@ -361,7 +355,7 @@ if __name__ == "__main__":
 
     st.divider()
 
-    # 3. Heart Rate Zone Visualization
+    # Heart Rate Zone Visualization
     st.subheader("Heart Rate Zone Distribution")
     
     # Prepare data for a Bar Chart
@@ -383,7 +377,7 @@ if __name__ == "__main__":
     with st.sidebar:
         if df is not None and not df.empty:
             # Pass the already loaded df to summary to avoid double-fetching
-            stats = summarize_n_days(current_range) 
+            stats = summarize_n_days(df) 
             
             st.markdown(f"### Last {current_range} Days")
             st.metric("Total Distance", f"{stats.get('Total Distance Run (mi)', 0):.1f} mi")
@@ -404,25 +398,41 @@ if __name__ == "__main__":
         else:
             st.error("Could not load Garmin data. Check your credentials.")
     
+    # Display existing messages from history
     for msg in msgs.messages:
         st.chat_message(msg.type).write(msg.content)
     
+    # Handle new user input
     if user_query := st.chat_input("Ask Coach about your training..."):
+        # Immediately show user message
         st.chat_message("human").write(user_query)
         
         with st.chat_message("assistant"):
-            response_placeholder = st.empty()
+            # Create a container for the response
+            response_container = st.container()
+            
             with st.spinner("Analyzing data and coaching files..."):
-                # Clear old charts before a new run
-                if os.path.exists("current_chart.png"):
-                    os.remove("current_chart.png")
-                    
-                response = coach_agent.invoke({"input": user_query})
-                st.write(response["output"])
+                try:
+                    # IMPORTANT: Double check the agent exists in state
+                    if "coach_agent" in st.session_state:
+                        # Clear old charts
+                        if os.path.exists("current_chart.png"):
+                            os.remove("current_chart.png")
+                        
+                        # Run the agent
+                        response = st.session_state.coach_agent.invoke({"input": user_query})
+                        
+                        # Write result to the container
+                        response_container.write(response["output"])
+                        
+                        # Display chart if generated
+                        if os.path.exists("current_chart.png"):
+                            st.image("current_chart.png", use_container_width=True)
+                    else:
+                        st.error("Coach agent is not initialized. Try refreshing the page.")
                 
-                # Display chart if the agent created one
-                if os.path.exists("current_chart.png"):
-                    st.image("current_chart.png", use_container_width=True)
+                except Exception as e:
+                    st.error(f"Agent Error: {e}")
 
 
 
