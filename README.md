@@ -37,7 +37,7 @@ GARMIN_EMAIL=your_email@example.com
 GARMIN_PASSWORD=your_password
 ```
 
-5. Run app
+4.
 Run the app from the command line using:
 ```bash
 streamlit run Home.py
