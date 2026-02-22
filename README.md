@@ -21,11 +21,12 @@ RAG (Retrieval-Augmented Generation): The coach is powered by professional coach
 git clone https://github.com/yourusername/garmin-analytics-ai.git
 cd garmin-analytics-ai
 ```
-2. Install Dependencies
+2. Activate a virtual environment
+3. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
-3. Environment Variables
+4. Environment Variables
 Create a cred.env file in the root directory and add your API keys:
 
 ```
