@@ -36,6 +36,13 @@ TAVILY_API_KEY=your_search_api_key
 GARMIN_EMAIL=your_email@example.com
 GARMIN_PASSWORD=your_password
 ```
+
+5. Run app
+Run the app from the command line using:
+```bash
+streamlit run Home.py
+```
+
 ---
 
 ## Usage
