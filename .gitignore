@@ -1,9 +1,26 @@
-# Secrets
-cred.env
-.env
-
-# Python/Jupyter junk
-.ipynb_checkpoints/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environments
+lc-env/
+venv/
+.env
+.env.* 
+
+# macOS
 .DS_Store
+
+# Any Logs
+*.log
+
+# Jupyter junk
+.ipynb_checkpoints/
+
+# Streamlit / temporary cache
+.streamlit/
+*.sqlite3
+.cache/
