@@ -17,22 +17,24 @@ RAG (Retrieval-Augmented Generation): The coach is powered by professional coach
 ---
 ## Setup & Installation
 1. Clone the Repo
-Bash
+```bash
 git clone https://github.com/yourusername/garmin-analytics-ai.git
 cd garmin-analytics-ai
+```
 2. Install Dependencies
-Bash
+```bash
 pip install -r requirements.txt
+```
 3. Environment Variables
 Create a cred.env file in the root directory and add your API keys:
 
-Code snippet
+```
 GOOGLE_API_KEY=your_gemini_api_key
 TAVILY_API_KEY=your_search_api_key
 # Garmin credentials can be entered via the UI or added here
 GARMIN_EMAIL=your_email@example.com
 GARMIN_PASSWORD=your_password
-
+```
 ---
 
 ## Usage
