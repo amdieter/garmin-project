@@ -229,6 +229,15 @@ if __name__ == "__main__":
 
     st.set_page_config(page_icon = "Home", page_title="Garmin Guru", layout="wide")
 
+    col_title, col_logo = st.columns([9, 1])
+
+    with col_title:
+        st.title("Garmin Guru")
+    
+    with col_logo:
+        # Use a local path or a URL
+        st.image("images/logo.png", width=150)
+
     # Initialize login state
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
@@ -273,8 +282,6 @@ if __name__ == "__main__":
         st.session_state.coach_agent = get_agent()
         # Get all-time for pr calc
         all_time_stats = summarize_n_days(st.session_state.df_all_time)
-    
-    st.title("Garmin Guru")
 
     with st.sidebar:
         st.header("📊 Training Summary")
