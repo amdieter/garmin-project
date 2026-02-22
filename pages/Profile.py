@@ -1,5 +1,5 @@
 import streamlit as st
-from data_utils import get_user_profile_data, plot_pr_only, get_pbs, format_seconds
+from data_utils import get_user_profile_data, plot_pr_only, get_pbs, format_seconds, summarize_n_days
 
 st.set_page_config(page_title="User Profile", layout="wide")
 
@@ -18,6 +18,12 @@ with st.spinner("Loading athlete profile..."):
     profile = get_user_profile_data(email, password)
     # We reuse the dataframe already stored in session state from the home page
     df = st.session_state.get("df_data")
+
+    df_all_time = st.session_state.get("df_all_time")
+
+    if df_all_time is not None and not df_all_time.empty:
+        # Run your existing function on the full dataset
+        all_time_stats = summarize_n_days(df_all_time)
 
 if profile:
     # User info
@@ -43,8 +49,8 @@ if profile:
     # Personal Bests
     st.subheader("Current Personal Bests")
     
-    if df is not None and not df.empty:
-        pbs_df = get_pbs(df)
+    if st.session_state.get("df_all_time") is not None:
+        pbs_df = get_pbs(st.session_state.df_all_time)
         
         if not pbs_df.empty:
             # Create 3 columns for 1 Mile, 5K, and 10K

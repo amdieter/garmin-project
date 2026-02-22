@@ -262,10 +262,17 @@ if __name__ == "__main__":
         
         df = get_cached_workout_data(current_range, email, pwd)
         stats = summarize_n_days(df)
-        
+
+        if "df_all_time" not in st.session_state:
+            with st.spinner("Fetching all-time history for PRs..."):
+                # Fetch 3650 days (10 years)
+                st.session_state.df_all_time = get_cached_workout_data(3650, email, pwd)
+            
         # Store df in session state
         st.session_state.df_data = df
         st.session_state.coach_agent = get_agent()
+        # Get all-time for pr calc
+        all_time_stats = summarize_n_days(st.session_state.df_all_time)
     
     st.title("Garmin Analytics AI")
 

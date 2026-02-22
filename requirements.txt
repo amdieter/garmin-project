@@ -1,0 +1,26 @@
+# Web Framework
+streamlit
+streamlit-folium
+
+# Garmin Integration
+garminconnect
+pandas
+
+# AI & LLM (LangChain)
+langchain
+langchain-community
+langchain-core
+langchain-google-genai
+langchain-experimental
+
+# Embeddings & Vector Store
+faiss-cpu
+gpt4all
+pypdf
+tiktoken
+
+# Visualization & Utils
+matplotlib
+folium
+python-dotenv
+tavily-python
