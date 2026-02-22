@@ -8,7 +8,7 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page first.")
     st.stop()
 
-st.title("Athlete Profile")
+st.title("Athlete Profile 🏃 ")
 
 # Fetch Profile & Workout Data
 email = st.session_state.garmin_email
@@ -47,7 +47,7 @@ if profile:
     st.divider()
 
     # Personal Bests
-    st.subheader("Current Personal Bests")
+    st.subheader("Current Personal Bests 🔥 ")
     
     if st.session_state.get("df_all_time") is not None:
         pbs_df = get_pbs(st.session_state.df_all_time)

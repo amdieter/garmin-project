@@ -227,7 +227,7 @@ def get_agent():
 
 if __name__ == "__main__":
 
-    st.set_page_config(page_icon = "Home", page_title="Garmin Analytics AI", layout="wide")
+    st.set_page_config(page_icon = "Home", page_title="Garmin Guru", layout="wide")
 
     # Initialize login state
     if "logged_in" not in st.session_state:
@@ -274,7 +274,7 @@ if __name__ == "__main__":
         # Get all-time for pr calc
         all_time_stats = summarize_n_days(st.session_state.df_all_time)
     
-    st.title("Garmin Analytics AI")
+    st.title("Garmin Guru")
 
     with st.sidebar:
         st.header("📊 Training Summary")
