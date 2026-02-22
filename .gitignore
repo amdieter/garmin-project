@@ -1,1 +1,9 @@
+# Secrets
 cred.env
+.env
+
+# Python/Jupyter junk
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.DS_Store
