@@ -3,6 +3,7 @@ langchain==0.3.27
 langchain-experimental==0.3.3
 langchain-google-genai==2.1.12
 langchain-tavily==0.2.17
+tabulate
 
 # Web framework
 streamlit==1.54.0

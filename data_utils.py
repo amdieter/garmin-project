@@ -85,7 +85,7 @@ def plot_vo2max_over_time(df, color="#10B981"):
     ax.set_title("VO₂ Max Trend")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width='stretch')
 
 def plot_weekly_training_time(df, color="#6366F1"):
     df_plot = df.copy()
@@ -97,7 +97,7 @@ def plot_weekly_training_time(df, color="#6366F1"):
     ax.set_title("Weekly Training Volume (Minutes)")
     plt.xticks(rotation=45)
     plt.tight_layout()
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width='stretch')
 
 def get_pbs(df):
   df["Date"] = pd.to_datetime(df["Date"])
@@ -199,7 +199,7 @@ def plot_pr_only(df):
     ax.legend()
     
     plt.tight_layout()
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width='stretch')
 
 def get_user_profile_data(email, password):
     try:
@@ -283,4 +283,4 @@ def plot_activity_map(df):
 
     folium.LayerControl().add_to(m)
     
-    st_folium(m, width=None, height=600, use_container_width=True, returned_objects=[])
+    st_folium(m, width='stretch', height=600, returned_objects=[])

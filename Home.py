@@ -39,27 +39,7 @@ if "memory" not in st.session_state:
     )
 
 # Functions
-# def summarize_n_days(n_days=1):
-#     df = get_workout_dataframe_n_days(n_days)
-#     if isinstance(df, tuple) or df is None or df.empty:
-#         return {k: 0 for k in ["Longest Run (mi)", "Total Distance Run (mi)", "Total Elevation Gained (ft)"]} | {"Current VO2 Max": "N/A"}
 
-#     summary = {}
-#     summary["Longest Run (mi)"] = df["Distance (mi)"].max()
-#     summary["Longest Run (min)"] = df["Duration (min)"].max()
-#     summary["Average Run Length (mi)"] = df["Distance (mi)"].mean()
-#     summary["Total Distance Run (mi)"] = df["Distance (mi)"].sum()
-#     summary["Total Duration Run (min)"] = df["Duration (min)"].sum()
-#     summary["Total Elevation Gained (ft)"] = df["Elev Gain (ft)"].sum()
-#     summary["Total Elevation Lost (ft)"] = df["Elev Loss (ft)"].sum()
-#     summary["Current VO2 Max"] = df["VO2 Max"][0]
-#     if n_days > 1:
-#         clean_df = df.dropna()
-#         if len(clean_df) > 1:
-#             summary["VO2 Max Progress"] = clean_df["VO2 Max"].iloc[0] - clean_df["VO2 Max"].iloc[-1]
-#     if n_days >= 31:
-#         summary["Most Active Month"] = most_active_month(df)
-#     return summary
 
 def most_active_month(df):
     df['Month'] = df['Date'].dt.month
@@ -68,63 +48,7 @@ def most_active_month(df):
     miles = monthly_miles.max()
     return month, miles
 
-# def get_workout_dataframe_n_days(n_days):
-#     try:
-#         client = garminconnect.Garmin(os.getenv("GARMIN_EMAIL"), os.getenv("GARMIN_PASSWORD"))
-#         client.login()
-#         today = date.today()
-#         days_to_subtract = timedelta(days=n_days)
-#         start = str(today - days_to_subtract)
-#         activities = client.get_activities_by_date(startdate = start, enddate = str(today))
 
-#         # if there's no activities in date range, return first (most recent) activity
-#         if not activities:
-#             activities = client.get_activities(0,1)
-
-#         data_list = []
-#         for act in activities:
-#             if act["activityType"]["typeKey"] != "running":
-#                 # print("non running")
-#                 continue
-#             dist_mi = act.get('distance', 0) / 1609.34
-#             dur_min = act.get('duration', 0) / 60
-
-#             # Pace Calculations
-#             pace_decimal = dur_min / dist_mi if dist_mi > 0 else 0
-
-#             # HR Zones (Converted from Seconds to Minutes)
-#             z1 = act.get('hrTimeInZone_1', 0) / 60
-#             z2 = act.get('hrTimeInZone_2', 0) / 60
-#             z3 = act.get('hrTimeInZone_3', 0) / 60
-#             z4 = act.get('hrTimeInZone_4', 0) / 60
-#             z5 = act.get('hrTimeInZone_5', 0) / 60
-
-#             record = {
-#                 "Activity Name": act.get('activityName'),
-#                 "Date": pd.to_datetime(act.get('startTimeLocal')),
-#                 "Distance (mi)": round(dist_mi, 2),
-#                 "Duration (min)": round(dur_min, 2),
-#                 "Pace_Decimal": round(pace_decimal, 2),
-#                 "Avg HR": act.get('averageHR'),
-#                 "Max HR": act.get('maxHR'),
-#                 "Elev Gain (ft)": round(act.get('elevationGain', 0) * 3.28084, 1),
-#                 "Elev Loss (ft)": round(act.get('elevationLoss', 0) * 3.28084, 1),
-#                 "VO2 Max": act.get('vO2MaxValue'),
-#                 # HR Zone columns
-#                 "Z1_Min": round(z1, 2),
-#                 "Z2_Min": round(z2, 2),
-#                 "Z3_Min": round(z3, 2),
-#                 "Z4_Min": round(z4, 2),
-#                 "Z5_Min": round(z5, 2)
-#             }
-#             data_list.append(record)
-
-#         df = pd.DataFrame(data_list)
-
-#         return df
-
-#     except Exception as e:
-#         return None, f"Error: {e}"
 
 # Tool Setup
 
@@ -180,8 +104,7 @@ def get_agent():
                 llm, 
                 current_df, 
                 verbose=False, 
-                allow_dangerous_code=True,
-                handle_parsing_errors=True 
+                allow_dangerous_code=True 
             )
             response = df_agent.invoke({"input": query})
             return response["output"]
@@ -200,14 +123,30 @@ def get_agent():
         name="Workout_Data_Analyzer",
         func=workout_data_query,
         description="Query this to get stats on the user's recent running activities, pace, and heart rate."
-        )
+        ),
+        search_tool
     ]
 
     # Prompt Definition
     Custom_Coach_Prompt = """
-        You are an analytical running coach, being presented with a Garmin User's recent activity data. Your job is to analyze their statistics, and respond to their queries using the tools available. Provide recommendations about training, warnings about heightened intensity or load, or injury risk.
-        For context: 5 heart rate zones are calculated as percentages of your maximum heart rate (roughly): Zone 1 (50–60%): Very light, warm-up; Zone 2 (60–70%): Light, aerobic base; Zone 3 (70–80%): Moderate, tempo; Zone 4 (80–90%): Hard, threshold; Zone 5 (90–100%): Maximum effort.
-    """
+                        You are 'Garmin Guru', an elite analytical running coach. You have access to the user's 
+                        historical Garmin data and a library of professional coaching principles.
+                        
+                        ### YOUR COACHING PHILOSOPHY:
+                        1. **The 80/20 Rule**: 80% of training should be 'Easy' (Zone 1 & 2). 20% should be 'Hard' (Zone 4 & 5).
+                        2. **Beware the 'Grey Zone'**: Frequent training in Zone 3 (Moderate/Tempo) without a specific purpose 
+                           may be a sign of 'plateau training.' Warn the user if they are stuck here.
+                        3. **Aerobic Deficiency Check**: If the user's Pace is slow but their Average Heart Rate is high, 
+                           advise them to focus on building their aerobic base.
+                        4. **Context Matters**: If a run has significant 'Elev Gain (ft)', do not penalize the user for a 
+                           slower pace—acknowledge the vertical effort.
+                        5. **Injury Prevention**: If 'Stress Ratio' is > 1.3, be firm about taking a rest/easy day.
+                        
+                        ### TOOL USAGE RULES:
+                        - Use **Workout_Data_Analyzer** to get specific numbers (e.g., "What was my Z2 time yesterday?").
+                        - Use **coaching_expert** to explain *why* a certain heart rate zone matters based on the PDFs.
+                        - Always provide a 'Coach's Verdict' at the end of your analysis: [Optimizing, Overreaching, or Detraining].
+                        """
     instructions = SystemMessage(content=Custom_Coach_Prompt)
     
     agent_prompt = ChatPromptTemplate.from_messages([
@@ -316,16 +255,16 @@ if __name__ == "__main__":
     if df is not None and not df.empty:
         st.divider()
         
-        # Create a label for the dropdown (Date + Name)
+        # Create label for the dropdown
         df['display_name'] = df['Date'].dt.strftime('%Y-%m-%d') + " - " + df['Activity Name']
         
         # Selection Box
         selected_run_name = st.selectbox("Select a past activity to analyze:", df['display_name'])
         
-        # Get the specific row for that activity
+        # select row
         run_data = df[df['display_name'] == selected_run_name].iloc[0]
     
-        # Key Metrics for the specific run
+        # Metrics
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Distance", f"{run_data['Distance (mi)']} mi")
         col2.metric("Pace", f"{run_data['Pace_Decimal']:.2f} min/mi")
@@ -335,15 +274,13 @@ if __name__ == "__main__":
     if st.button("Coach: Critique this Run"):
         with st.spinner("Analyzing effort..."):
             # We pass the specific run data to the agent
-            critique_query = f"Analyze this specific run: {run_data.to_json()}. Based on the HR zones and pace, was this a good workout? Check the coaching PDFs for context."
+            critique_query = f"Analyze this specific run: {run_data.to_json()}. Based on the HR zones and pace, was this a good workout? Check the coaching PDFs for context. Suggest ways to improve."
             response = coach_agent.invoke({"input": critique_query})
             st.chat_message("assistant").write(response["output"])
 
     if df is not None and not df.empty:
         # Get the Stress Score
         stress_score = get_training_stress(df)
-        
-        # Create a high-level status banner
         st.subheader("Training Readiness")
         
         # Define status colors/labels
@@ -371,8 +308,6 @@ if __name__ == "__main__":
 
     # Heart Rate Zone Visualization
     st.subheader("Heart Rate Zone Distribution")
-    
-    # Prepare data for a Bar Chart
     hr_zones = {
         "Zone 1 (Recovery)": run_data['Z1_Min'],
         "Zone 2 (Aerobic)": run_data['Z2_Min'],
@@ -380,17 +315,13 @@ if __name__ == "__main__":
         "Zone 4 (Threshold)": run_data['Z4_Min'],
         "Zone 5 (Anaerobic)": run_data['Z5_Min']
     }
-    
-    # Convert to a mini dataframe for plotting
+    # Bar chart
     hr_df = pd.DataFrame(list(hr_zones.items()), columns=['Zone', 'Minutes'])
-    
-    # Display as a Bar Chart
     st.bar_chart(hr_df.set_index('Zone'))
     
-    # Sidebar Statistics
+    # Summary Stats
     with st.sidebar:
         if df is not None and not df.empty:
-            # Pass the already loaded df to summary to avoid double-fetching
             stats = summarize_n_days(df) 
             
             st.markdown(f"### Last {current_range} Days")
@@ -400,15 +331,13 @@ if __name__ == "__main__":
     
             st.divider()
             
-            # Use a spinner because calling the AI for a joke can take a second
             with st.spinner("Generating commentary..."):
-                # Ensure the function name matches what you defined (get_ai_hot_take)
                 joke = get_ai_hot_take(stats)
                 st.info(joke)
     
     with st.expander("📊 View Recent Activity Data"):
         if df is not None:
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width='stretch')
         else:
             st.error("Could not load Garmin data. Check your credentials.")
     
@@ -422,12 +351,12 @@ if __name__ == "__main__":
         st.chat_message("human").write(user_query)
         
         with st.chat_message("assistant"):
-            # Create a container for the response
+            # Container for the response
             response_container = st.container()
             
             with st.spinner("Analyzing data and coaching files..."):
                 try:
-                    # IMPORTANT: Double check the agent exists in state
+                    # Double check the agent exists in state
                     if "coach_agent" in st.session_state:
                         # Clear old charts
                         if os.path.exists("current_chart.png"):
@@ -441,7 +370,7 @@ if __name__ == "__main__":
                         
                         # Display chart if generated
                         if os.path.exists("current_chart.png"):
-                            st.image("current_chart.png", use_container_width=True)
+                            st.image("current_chart.png", width='stretch')
                     else:
                         st.error("Coach agent is not initialized. Try refreshing the page.")
                 
