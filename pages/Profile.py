@@ -1,5 +1,7 @@
 import streamlit as st
 from data_utils import get_user_profile_data, plot_pr_only, get_pbs, format_seconds, summarize_n_days
+from style_utils import apply_custom_style
+apply_custom_style()
 
 st.set_page_config(page_title="User Profile", layout="wide")
 

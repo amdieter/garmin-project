@@ -1,5 +1,7 @@
 import streamlit as st
 from data_utils import plot_activity_map, get_cached_workout_data 
+from style_utils import apply_custom_style
+apply_custom_style()
 
 st.set_page_config(page_title="Activity Map", layout="wide")
 

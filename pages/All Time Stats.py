@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from data_utils import get_cached_workout_data, summarize_n_days, plot_weekly_training_time, plot_vo2max_over_time, plot_pr_only, get_training_stress
+from style_utils import apply_custom_style
+apply_custom_style()
 
 st.set_page_config(page_title="Long Term Analytics", layout="wide")
 

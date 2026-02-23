@@ -26,8 +26,11 @@ from langchain_core.messages import SystemMessage
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 import matplotlib.pyplot as plt
 from data_utils import get_cached_workout_data, summarize_n_days, get_training_stress, get_workout_dataframe_n_days
+from style_utils import apply_custom_style
 GARMIN_CACHE = None
 load_dotenv("cred.env")
+
+apply_custom_style()
 
 # persists specifically for Streamlit sessions
 msgs = StreamlitChatMessageHistory(key="chat_messages")
@@ -92,7 +95,7 @@ def get_agent():
         coaching_retriever = coaching_store.as_retriever()
         coaching_store.save_local("docs/coaching-store")
 
-    llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash", google_api_key = api_key, temperature=0)
+    llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash", google_api_key = api_key, temperature=0.15)
 
     def workout_data_query(query: str):
         try:
@@ -145,12 +148,13 @@ def get_agent():
                         ### TOOL USAGE RULES:
                         - Use **Workout_Data_Analyzer** to get specific numbers (e.g., "What was my Z2 time yesterday?").
                         - Use **coaching_expert** to explain *why* a certain heart rate zone matters based on the PDFs.
-                        - Always provide a 'Coach's Verdict' at the end of your analysis: [Optimizing, Overreaching, or Detraining].
+                        - Use the search tool to search for relevant information on the internet.
+                        - Always provide a 'Coach's Verdict' at the end of an analysis: [Optimizing, Overreaching, or Detraining]. A verdict is only necessary if you are asked to analyze activities.
                         """
     instructions = SystemMessage(content=Custom_Coach_Prompt)
     
     agent_prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an analytical running coach. Analyze Garmin data and provide advice."),
+        ("system", Custom_Coach_Prompt),
         MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -273,10 +277,21 @@ if __name__ == "__main__":
     
     if st.button("Coach: Critique this Run"):
         with st.spinner("Analyzing effort..."):
-            # We pass the specific run data to the agent
+            # Prepare the query
             critique_query = f"Analyze this specific run: {run_data.to_json()}. Based on the HR zones and pace, was this a good workout? Check the coaching PDFs for context. Suggest ways to improve."
-            response = coach_agent.invoke({"input": critique_query})
+            
+            # Pull history from session state memory
+            history = st.session_state.memory.load_memory_variables({})["chat_history"]
+    
+            # Invoke with history included
+            response = coach_agent.invoke({
+                "input": critique_query,
+                "chat_history": history
+            })
+            
+            # Display and save to memory manually (since this isn't the chat_input loop)
             st.chat_message("assistant").write(response["output"])
+            st.session_state.memory.save_context({"input": critique_query}, {"output": response["output"]})
 
     if df is not None and not df.empty:
         # Get the Stress Score
@@ -363,7 +378,10 @@ if __name__ == "__main__":
                             os.remove("current_chart.png")
                         
                         # Run the agent
-                        response = st.session_state.coach_agent.invoke({"input": user_query})
+                        response = st.session_state.coach_agent.invoke({
+                            "input": user_query,
+                            "chat_history": st.session_state.memory.load_memory_variables({})["chat_history"]
+                        })
                         
                         # Write result to the container
                         response_container.write(response["output"])
