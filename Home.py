@@ -41,17 +41,6 @@ if "memory" not in st.session_state:
         return_messages=True
     )
 
-# Functions
-
-
-def most_active_month(df):
-    df['Month'] = df['Date'].dt.month
-    monthly_miles = df.groupby("Month")["Distance (mi)"].sum()
-    month = monthly_miles.idxmax()
-    miles = monthly_miles.max()
-    return month, miles
-
-
 
 # Tool Setup
 
@@ -256,42 +245,79 @@ if __name__ == "__main__":
     df = st.session_state.get("df_data")
     
     # Activity Selector Dropdown
+    # if df is not None and not df.empty:
+    #     st.divider()
+        
+    #     # Create label for the dropdown
+    #     df['display_name'] = df['Date'].dt.strftime('%Y-%m-%d') + " - " + df['Activity Name']
+        
+    #     # Selection Box
+    #     selected_run_name = st.selectbox("Select a past activity to analyze:", df['display_name'])
+        
+    #     # select row
+    #     run_data = df[df['display_name'] == selected_run_name].iloc[0]
+    
+    #     # Metrics
+    #     col1, col2, col3, col4 = st.columns(4)
+    #     col1.metric("Distance", f"{run_data['Distance (mi)']} mi")
+    #     col2.metric("Pace", f"{run_data['Pace_Decimal']:.2f} min/mi")
+    #     col3.metric("Avg HR", f"{run_data['Avg HR']} bpm")
+    #     col4.metric("Elev Gain", f"{run_data['Elev Gain (ft)']} ft")
     if df is not None and not df.empty:
         st.divider()
-        
-        # Create label for the dropdown
-        df['display_name'] = df['Date'].dt.strftime('%Y-%m-%d') + " - " + df['Activity Name']
-        
-        # Selection Box
-        selected_run_name = st.selectbox("Select a past activity to analyze:", df['display_name'])
-        
-        # select row
-        run_data = df[df['display_name'] == selected_run_name].iloc[0]
+        st.header("🏃 Recent Activities")
     
-        # Metrics
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Distance", f"{run_data['Distance (mi)']} mi")
-        col2.metric("Pace", f"{run_data['Pace_Decimal']:.2f} min/mi")
-        col3.metric("Avg HR", f"{run_data['Avg HR']} bpm")
-        col4.metric("Elev Gain", f"{run_data['Elev Gain (ft)']} ft")
-    
-    if st.button("Coach: Critique this Run"):
-        with st.spinner("Analyzing effort..."):
-            # Prepare the query
-            critique_query = f"Analyze this specific run: {run_data.to_json()}. Based on the HR zones and pace, was this a good workout? Check the coaching PDFs for context. Suggest ways to improve."
+        # Loop through the dataframe rows to create the feed
+        for index, row in df.iterrows():
+            # Create a unique container for each run
+            with st.container(border=True):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.subheader(f"{row['Date'].strftime('%A, %b %d')} — {row['Activity Name']}")
+                    
+                    # Horizontal metrics for this specific run
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Distance", f"{row['Distance (mi)']} mi")
+                    m2.metric("Pace", f"{row['Pace_Decimal']:.2f}/mi")
+                    m3.metric("Avg HR", f"{row['Avg HR']} bpm")
+                    m4.metric("Elevation", f"{row['Elev Gain (ft)']} ft")
+                
+                with col2:
+                    # Place the "Critique" button inside the card
+                    if st.button("Critique", key=f"btn_{index}"):
+                        with st.spinner("Analyzing..."):
+                            critique_query = f"Analyze this specific run: {row.to_json()}. Based on the HR zones and pace, was this a good workout? Check the coaching PDFs for context. \
+                            Suggest ways to improve."
+                            history = st.session_state.memory.load_memory_variables({})["chat_history"]
+                            response = st.session_state.coach_agent.invoke({
+                                "input": critique_query,
+                                "chat_history": history
+                            })
+                            st.info(response["output"])
             
-            # Pull history from session state memory
-            history = st.session_state.memory.load_memory_variables({})["chat_history"]
+                # Optional: Add a small HR Zone mini-chart inside the card
+                with st.expander("View Zone Breakdown"):
+                    zones = {"Z1": row['Z1_Min'], "Z2": row['Z2_Min'], "Z3": row['Z3_Min'], "Z4": row['Z4_Min'], "Z5": row['Z5_Min']}
+                    st.bar_chart(pd.Series(zones), horizontal=True, height=150)
     
-            # Invoke with history included
-            response = coach_agent.invoke({
-                "input": critique_query,
-                "chat_history": history
-            })
+    # if st.button("Coach: Critique this Run"):
+    #     with st.spinner("Analyzing effort..."):
+    #         # Prepare the query
+    #         critique_query = f"Analyze this specific run: {run_data.to_json()}. Based on the HR zones and pace, was this a good workout? Check the coaching PDFs for context. Suggest ways to improve."
             
-            # Display and save to memory manually (since this isn't the chat_input loop)
-            st.chat_message("assistant").write(response["output"])
-            st.session_state.memory.save_context({"input": critique_query}, {"output": response["output"]})
+    #         # Pull history from session state memory
+    #         history = st.session_state.memory.load_memory_variables({})["chat_history"]
+    
+    #         # Invoke with history included
+    #         response = coach_agent.invoke({
+    #             "input": critique_query,
+    #             "chat_history": history
+    #         })
+            
+    #         # Display and save to memory manually (since this isn't the chat_input loop)
+    #         st.chat_message("assistant").write(response["output"])
+    #         st.session_state.memory.save_context({"input": critique_query}, {"output": response["output"]})
 
     if df is not None and not df.empty:
         # Get the Stress Score
@@ -322,17 +348,17 @@ if __name__ == "__main__":
     st.divider()
 
     # Heart Rate Zone Visualization
-    st.subheader("Heart Rate Zone Distribution")
-    hr_zones = {
-        "Zone 1 (Recovery)": run_data['Z1_Min'],
-        "Zone 2 (Aerobic)": run_data['Z2_Min'],
-        "Zone 3 (Tempo)": run_data['Z3_Min'],
-        "Zone 4 (Threshold)": run_data['Z4_Min'],
-        "Zone 5 (Anaerobic)": run_data['Z5_Min']
-    }
-    # Bar chart
-    hr_df = pd.DataFrame(list(hr_zones.items()), columns=['Zone', 'Minutes'])
-    st.bar_chart(hr_df.set_index('Zone'))
+    # st.subheader("Heart Rate Zone Distribution")
+    # hr_zones = {
+    #     "Zone 1 (Recovery)": run_data['Z1_Min'],
+    #     "Zone 2 (Aerobic)": run_data['Z2_Min'],
+    #     "Zone 3 (Tempo)": run_data['Z3_Min'],
+    #     "Zone 4 (Threshold)": run_data['Z4_Min'],
+    #     "Zone 5 (Anaerobic)": run_data['Z5_Min']
+    # }
+    # # Bar chart
+    # hr_df = pd.DataFrame(list(hr_zones.items()), columns=['Zone', 'Minutes'])
+    # st.bar_chart(hr_df.set_index('Zone'))
     
     # Summary Stats
     with st.sidebar:

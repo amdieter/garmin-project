@@ -6,11 +6,38 @@ import matplotlib.pyplot as plt
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import HeatMap
+import os
+from garth.exc import GarthException
+
+def get_garmin_client(email, password):
+    """Saves login info so that IP doesn't get soft-blocked"""
+    # Define a directory to save the session tokens
+    token_store = "~/.garth" 
+    token_store = os.path.expanduser(token_store)
+    
+    client = garminconnect.Garmin(email, password)
+    
+    try:
+        # Try to load an existing session from the folder
+        client.login(token_store)
+        print("Login successful using stored tokens.")
+    except (GarthException, Exception):
+        # If tokens are missing or expired, do a fresh login
+        print("Token login failed. Attempting fresh email/password login...")
+        try:
+            client.login()
+            # Save the new tokens so we don't have to do this next time
+            client.garth.dump(token_store)
+        except Exception as e:
+            print(f"Total login failure: {e}")
+            return None
+            
+    return client
 
 # data fetching
 def get_workout_dataframe_n_days(n_days, email, password):
     try:
-        client = garminconnect.Garmin(email, password)
+        client = get_garmin_client(email, password)
         client.login()
         
         today = date.today()
@@ -54,7 +81,16 @@ def get_workout_dataframe_n_days(n_days, email, password):
 def get_cached_workout_data(days, email, password):
     return get_workout_dataframe_n_days(days, email, password)
 
-# Calculations 
+# Calculations
+
+
+def most_active_month(df):
+    df['Month'] = df['Date'].dt.month
+    monthly_miles = df.groupby("Month")["Distance (mi)"].sum()
+    month = monthly_miles.idxmax()
+    miles = monthly_miles.max()
+    return month, miles
+
 def summarize_n_days(df):
     if isinstance(df, tuple) or df is None or df.empty:
         return {"Total Distance Run (mi)": 0,
@@ -68,12 +104,12 @@ def summarize_n_days(df):
         "Current VO2 Max": df["VO2 Max"].dropna().iloc[0] if not df["VO2 Max"].dropna().empty else "N/A",
         "Longest Run (mi)": df["Distance (mi)"].max()
     }
-    # if n_days > 1:
-    #     clean_df = df.dropna()
-    #     if len(clean_df) > 1:
-    #         summary["VO2 Max Progress"] = clean_df["VO2 Max"].iloc[0] - clean_df["VO2 Max"].iloc[-1]
-    # if n_days >= 31:
-    #     summary["Most Active Month"] = most_active_month(df)
+    if len(df) > 1:
+        clean_df = df.dropna()
+        if len(clean_df) > 1:
+            summary["VO2 Max Progress"] = clean_df["VO2 Max"].iloc[0] - clean_df["VO2 Max"].iloc[-1]
+    if len(df) >= 31:
+        summary["Most Active Month"] = most_active_month(df)
     return summary
 
 # Plotting
@@ -203,7 +239,7 @@ def plot_pr_only(df):
 
 def get_user_profile_data(email, password):
     try:
-        client = garminconnect.Garmin(email, password)
+        client = get_garmin_client(email, password)
         client.login()
         
         user_profile = client.get_user_profile()
